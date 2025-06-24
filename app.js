@@ -7,7 +7,7 @@ const port = process.env.PORT || 3000;
 
 const { increaseIncoming, getCounts } = require('./utils/counter');
 const successRoutes = require('./routes/success');
-const errorRoutes = require('./routes/error');
+const errorRoutes = require('./routes/errors');
 
 // Middleware
 app.use(express.json());
