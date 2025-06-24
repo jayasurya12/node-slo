@@ -1,20 +1,7 @@
 #!/bin/bash
 
 # --- USAGE ---
-# ./simulate.sh 100 70
-# Runs continuously: 100 requests per batch, 70% success, 30% error
-
-TOTAL_REQUESTS=$1
-SUCCESS_PERCENT=$2
-
-# 🛑 Validate input
-if [ -z "$TOTAL_REQUESTS" ] || [ -z "$SUCCESS_PERCENT" ]; then
-  echo "❗ Usage: ./simulate.sh <total_requests> <success_percent>"
-  exit 1
-fi
-
-ERROR_PERCENT=$((100 - SUCCESS_PERCENT))
-BASE_URL="http://localhost:3000"
+# ./simulate.sh
 
 SUCCESS_ENDPOINTS=(
   "/success/200"
@@ -29,39 +16,37 @@ ERROR_ENDPOINTS=(
   "/error/custom-span"
 )
 
-# 🛰 Send a random request and return status
+SLOW_ENDPOINT="/slow/timeout"
+OUTGOING_ENDPOINT="/outgoing/httpbin"
+BASE_URL="http://localhost:3000"
+
 send_random_request() {
   local -n endpoints=$1
-  RANDOM_INDEX=$((RANDOM % ${#endpoints[@]}))
-  FULL_URL="$BASE_URL${endpoints[$RANDOM_INDEX]}"
-  STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$FULL_URL")
-  echo "→ $FULL_URL | Status: $STATUS_CODE"
-  echo "$STATUS_CODE"
+  local index=$((RANDOM % ${#endpoints[@]}))
+  local full_url="$BASE_URL${endpoints[$index]}"
+  echo "→ Hitting $full_url"
+  curl -s -o /dev/null -w "%{http_code}\n" "$full_url"
 }
 
-# 🔁 Run batches forever
+maybe_send_slow() {
+  local chance=$((RANDOM % 10))
+  if [ $chance -eq 0 ]; then
+    echo "🐢 Triggering slow request: $BASE_URL$SLOW_ENDPOINT"
+    curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL$SLOW_ENDPOINT" &
+  fi
+}
+
 while true; do
-  echo "🚀 Sending $TOTAL_REQUESTS requests: $SUCCESS_PERCENT% success, $ERROR_PERCENT% error..."
+  echo "🔁 Triggering batch at $(date)"
 
-  success_count=0
-  error_count=0
+  send_random_request SUCCESS_ENDPOINTS
+  send_random_request ERROR_ENDPOINTS
 
-  for ((i=1; i<=TOTAL_REQUESTS; i++)); do
-    CHANCE=$((RANDOM % 100))
-    if [ $CHANCE -lt $SUCCESS_PERCENT ]; then
-      status=$(send_random_request SUCCESS_ENDPOINTS)
-    else
-      status=$(send_random_request ERROR_ENDPOINTS)
-    fi
+  echo "🌐 Outgoing: $BASE_URL$OUTGOING_ENDPOINT"
+  curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL$OUTGOING_ENDPOINT" &
 
-    if [[ "$status" =~ ^2[0-9][0-9]$ ]]; then
-      ((success_count++))
-    else
-      ((error_count++))
-    fi
-  done
+  maybe_send_slow
 
-  echo "✅ Batch complete: Success=$success_count | Error=$error_count"
-  echo "-------------------------------------------"
-  sleep 1
+  echo "⏱ Sleeping for 10 seconds..."
+  sleep 10
 done

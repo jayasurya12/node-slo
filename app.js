@@ -37,11 +37,16 @@ app.get('/', (req, res) => {
   `);
 });
 
+// slow
+app.get('/slow/timeout', require('./routes/slow/timeout'));
+
 // Success Routes
 app.get('/success/200', successRoutes.ok);
 app.get('/success/201', successRoutes.created);
 app.get('/success/202', successRoutes.accepted);
 app.get('/success/outgoing', successRoutes.outgoing);
+app.get('/outgoing/httpbin', successRoutes.httpbinCall);
+
 
 // Error Routes
 app.get('/error/unhandled', errorRoutes.unhandled);
