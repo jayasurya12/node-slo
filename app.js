@@ -17,7 +17,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Homepage
+// Homepages
 app.get('/', (req, res) => {
   res.send(`
     <h2>Success Routes</h2>
