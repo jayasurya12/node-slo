@@ -1,4 +1,4 @@
-// require('dd-trace').init();
+require('dd-trace').init();
 const express = require('express');
 const app = express();
 const dotenv = require('dotenv');
