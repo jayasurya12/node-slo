@@ -1,5 +1,4 @@
-require('./dd-tracer'); // Start Datadog tracing
-
+const tracer = require('dd-trace').init();
 const express = require('express');
 const app = express();
 const port = 3000;
