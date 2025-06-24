@@ -45,7 +45,7 @@ app.get('/success/200', successRoutes.ok);
 app.get('/success/201', successRoutes.created);
 app.get('/success/202', successRoutes.accepted);
 app.get('/success/outgoing', successRoutes.outgoing);
-app.get('/outgoing/httpbin', successRoutes.httpbinCall);
+app.get('/outgoing/httpbin', successRoutes.httpbinMethods);
 
 
 // Error Routes

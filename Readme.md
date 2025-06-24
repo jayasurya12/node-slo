@@ -43,7 +43,8 @@ curl -X POST http://localhost:3000/error/json \
   -H "Content-Type: application/json" \
   -d '{"bad": }'
 
-./simulate.sh 100 70
+./simulate.sh success 90 error 5 waitevent 5 round 3
+
 
 
 project-root/

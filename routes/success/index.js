@@ -3,5 +3,5 @@ module.exports = {
   created: require('./created201'),
   accepted: require('./accepted202'),
   outgoing: require('./outgoingExample'),
-  httpbinCall: require('./httpbinCall')
+  httpbinMethods: require('./httpbinMethods')
 };

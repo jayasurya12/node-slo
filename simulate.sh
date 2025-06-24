@@ -1,8 +1,34 @@
 #!/bin/bash
 
-# --- USAGE ---
-# ./simulate.sh
+# --- Default Values ---
+SUCCESS_PERCENT=70
+ERROR_REQUESTS=10
+SLEEP_SECONDS=5
+ROUNDS=-1  # -1 means infinite loop
 
+# --- Parse Named Arguments ---
+for ((i=1; i<=$#; i++)); do
+  arg=${!i}
+  next=$((i+1))
+  val=${!next}
+
+  case "$arg" in
+    success)
+      SUCCESS_PERCENT=$val
+      ;;
+    error)
+      ERROR_REQUESTS=$val
+      ;;
+    waitevent)
+      SLEEP_SECONDS=$val
+      ;;
+    round)
+      ROUNDS=$val
+      ;;
+  esac
+done
+
+# --- Internals ---
 SUCCESS_ENDPOINTS=(
   "/success/200"
   "/success/201"
@@ -17,15 +43,29 @@ ERROR_ENDPOINTS=(
 )
 
 SLOW_ENDPOINT="/slow/timeout"
-OUTGOING_ENDPOINT="/outgoing/httpbin"
 BASE_URL="http://localhost:3000"
 
+# --- Functions ---
 send_random_request() {
   local -n endpoints=$1
   local index=$((RANDOM % ${#endpoints[@]}))
   local full_url="$BASE_URL${endpoints[$index]}"
-  echo "→ Hitting $full_url"
+  echo "→ $full_url"
   curl -s -o /dev/null -w "%{http_code}\n" "$full_url"
+}
+
+random_method_httpbin_call() {
+  METHODS=("get" "post" "put" "delete")
+  METHOD=${METHODS[$((RANDOM % 4))]}
+  SHOULD_FAIL=$((RANDOM % 4 == 0))
+  URL="$BASE_URL/outgoing/httpbin-method?method=$METHOD"
+
+  if [ $SHOULD_FAIL -eq 1 ]; then
+    URL="$URL&fail=true"
+  fi
+
+  echo "🔁 Simulating $METHOD httpbin (fail=$SHOULD_FAIL): $URL"
+  curl -s -o /dev/null -w "%{http_code}\n" "$URL" &
 }
 
 maybe_send_slow() {
@@ -36,17 +76,27 @@ maybe_send_slow() {
   fi
 }
 
-while true; do
-  echo "🔁 Triggering batch at $(date)"
+# --- Execution ---
+current_round=0
+while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
+  echo "🔁 Round $((current_round+1)) @ $(date)"
 
-  send_random_request SUCCESS_ENDPOINTS
-  send_random_request ERROR_ENDPOINTS
+  for ((i=1; i<=ERROR_REQUESTS; i++)); do
+    CHANCE=$((RANDOM % 100))
+    if [ $CHANCE -lt $SUCCESS_PERCENT ]; then
+      send_random_request SUCCESS_ENDPOINTS
+    else
+      send_random_request ERROR_ENDPOINTS
+    fi
+  done
 
-  echo "🌐 Outgoing: $BASE_URL$OUTGOING_ENDPOINT"
-  curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL$OUTGOING_ENDPOINT" &
-
+  random_method_httpbin_call
   maybe_send_slow
 
-  echo "⏱ Sleeping for 10 seconds..."
-  sleep 10
+  echo "⏱ Sleeping for $SLEEP_SECONDS seconds..."
+  sleep $SLEEP_SECONDS
+
+  current_round=$((current_round + 1))
 done
+
+echo "✅ Simulation completed"
