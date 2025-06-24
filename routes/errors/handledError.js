@@ -1,4 +1,6 @@
+const logger = require('../../utils/eventLogger');
+
 module.exports = (req, res) => {
-  console.log('⚠️ Handling error intentionally...');
-  res.status(500).send('Handled error: Something went wrong!');
+  logger.emit('error');
+  res.status(500).send('This is a handled error');
 };

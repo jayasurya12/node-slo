@@ -1,3 +1,6 @@
+const logger = require('../../utils/eventLogger');
+
 module.exports = (req, res) => {
-  res.status(200).send('200 OK - Standard success response');
+  logger.emit('success');
+  res.status(200).send('OK 200 - Success');
 };
