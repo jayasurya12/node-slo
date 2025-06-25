@@ -46,11 +46,19 @@ SLOW_ENDPOINT="/slow/timeout"
 BASE_URL="http://localhost:3000"
 
 # --- Functions ---
+
 send_random_request() {
   local -n endpoints=$1
   local index=$((RANDOM % ${#endpoints[@]}))
-  local full_url="$BASE_URL${endpoints[$index]}"
-  echo "→ $full_url"
+  local endpoint="${endpoints[$index]}"
+  local full_url="$BASE_URL$endpoint"
+
+  if [[ "$endpoint" == *"success"* ]]; then
+    echo "✅ [SUCCESS] → $full_url"
+  else
+    echo "❌ [ERROR] → $full_url"
+  fi
+
   curl -s -o /dev/null -w "%{http_code}\n" "$full_url"
 }
 
@@ -60,18 +68,30 @@ random_method_httpbin_call() {
   SHOULD_FAIL=$((RANDOM % 4 == 0))
   URL="$BASE_URL/outgoing/httpbin-method?method=$METHOD"
 
+  EMOJI=""
+  case "$METHOD" in
+    get) EMOJI="🔍";;
+    post) EMOJI="➕";;
+    put) EMOJI="✏️";;
+    delete) EMOJI="🗑️";;
+  esac
+
+  FAIL_ICON=""
   if [ $SHOULD_FAIL -eq 1 ]; then
     URL="$URL&fail=true"
+    FAIL_ICON="❌"
+  else
+    FAIL_ICON="✅"
   fi
 
-  echo "🔁 Simulating $METHOD httpbin (fail=$SHOULD_FAIL): $URL"
+  echo "$EMOJI [HTTPBIN $METHOD] $FAIL_ICON → $URL"
   curl -s -o /dev/null -w "%{http_code}\n" "$URL" &
 }
 
 maybe_send_slow() {
   local chance=$((RANDOM % 10))
   if [ $chance -eq 0 ]; then
-    echo "🐢 Triggering slow request: $BASE_URL$SLOW_ENDPOINT"
+    echo "🐢 [SLOW] → $BASE_URL$SLOW_ENDPOINT"
     curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL$SLOW_ENDPOINT" &
   fi
 }
@@ -79,6 +99,7 @@ maybe_send_slow() {
 # --- Execution ---
 current_round=0
 while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
+  echo ""
   echo "🔁 Round $((current_round+1)) @ $(date)"
 
   for ((i=1; i<=ERROR_REQUESTS; i++)); do
