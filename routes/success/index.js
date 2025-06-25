@@ -3,5 +3,7 @@ module.exports = {
   created: require('./created201'),
   accepted: require('./accepted202'),
   outgoing: require('./outgoingExample'),
-  httpbinMethods: require('./httpbinMethods')
+  httpbinMethods: require('./httpbinMethods'),
+  updatePut: require('./updatePut'),
+  delete: require('./delete')
 };

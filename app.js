@@ -45,6 +45,8 @@ app.get('/success/200', successRoutes.ok);
 app.get('/success/201', successRoutes.created);
 app.get('/success/202', successRoutes.accepted);
 app.get('/success/outgoing', successRoutes.outgoing);
+app.get('/success/update', successRoutes.updatePut);
+app.get('/success/delete', successRoutes.delete);
 app.get('/outgoing/httpbin', successRoutes.httpbinMethods);
 
 
@@ -53,6 +55,8 @@ app.get('/error/unhandled', errorRoutes.unhandled);
 app.get('/error/handled', errorRoutes.handled);
 app.get('/error/async', errorRoutes.async);
 app.get('/error/custom-span', errorRoutes.customSpan);
+app.get('/error/deleteFail', errorRoutes.deleteFail);
+app.get('/error/updateFail', errorRoutes.updateFail);
 app.post('/error/json', errorRoutes.json, (req, res) => {
   res.send('Valid JSON received');
 });

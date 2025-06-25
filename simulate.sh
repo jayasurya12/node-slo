@@ -33,6 +33,10 @@ SUCCESS_ENDPOINTS=(
   "/success/200"
   "/success/201"
   "/success/202"
+  "/success/httpbin"
+  "/success/update"
+  "/outgoing/httpbin"
+  "/outgoing/delete"
 )
 
 ERROR_ENDPOINTS=(
@@ -40,6 +44,8 @@ ERROR_ENDPOINTS=(
   "/error/handled"
   "/error/async"
   "/error/custom-span"
+  "/error/deleteFail"
+  "/error/updateFail"
 )
 
 SLOW_ENDPOINT="/slow/timeout"
