@@ -5,6 +5,8 @@ SUCCESS_PERCENT=70
 ERROR_REQUESTS=10
 SLEEP_SECONDS=5
 ROUNDS=-1  # -1 means infinite loop
+SERVER_CHECK_RETRIES=5
+SERVER_URL="http://localhost:3000"
 
 # --- Parse Named Arguments ---
 for ((i=1; i<=$#; i++)); do
@@ -49,9 +51,24 @@ ERROR_ENDPOINTS=(
 )
 
 SLOW_ENDPOINT="/slow/timeout"
-BASE_URL="http://localhost:3000"
+BASE_URL="$SERVER_URL"
 
 # --- Functions ---
+
+check_server_ready() {
+  for ((i=1; i<=SERVER_CHECK_RETRIES; i++)); do
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SERVER_URL")
+    if [[ "$HTTP_CODE" =~ ^2|3 ]]; then
+      echo "✅ Server is ready at $SERVER_URL"
+      return 0
+    fi
+    echo "⏳ Waiting for server to be ready ($i/$SERVER_CHECK_RETRIES)..."
+    sleep 2
+  done
+
+  echo "❌ Server not ready after $SERVER_CHECK_RETRIES attempts. Exiting."
+  exit 1
+}
 
 send_random_request() {
   local -n endpoints=$1
@@ -103,6 +120,8 @@ maybe_send_slow() {
 }
 
 # --- Execution ---
+check_server_ready
+
 current_round=0
 while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
   echo ""
