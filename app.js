@@ -1,11 +1,11 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
-// require('dd-trace').init({
-//     runtimeMetrics: true,
-//     logInjection: true
-// });
-// require('newrelic');
+require('dd-trace').init({
+    runtimeMetrics: true,
+    logInjection: true
+});
+require('newrelic');
 
 const express = require('express');
 const app = express();
@@ -74,6 +74,7 @@ app.get('/error/async', errorRoutes.async);
 app.get('/error/custom-span', errorRoutes.customSpan);
 app.get('/error/deleteFail', errorRoutes.deleteFail);
 app.get('/error/updateFail', errorRoutes.updateFail);
+
 app.post('/error/json', errorRoutes.json, (req, res) => {
   res.send('Valid JSON received');
 });
