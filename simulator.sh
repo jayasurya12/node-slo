@@ -9,6 +9,7 @@ SERVER_CHECK_RETRIES=5
 SERVER_URL="http://localhost:3000"
 EXTERNAL_CALL="no"
 INTERNAL_CALL="yes"
+UNKNOWN_ROUTE=0
 
 # --- Parse Arguments ---
 while [[ $# -gt 0 ]]; do
@@ -18,9 +19,10 @@ while [[ $# -gt 0 ]]; do
     success) SUCCESS_PERCENT=$val; shift 2 ;;
     error) ERROR_REQUESTS=$val; shift 2 ;;
     waitevent) SLEEP_SECONDS=$val; shift 2 ;;
-    round|ROUNDS) ROUNDS=$val; shift 2 ;;
+    round) ROUNDS=$val; shift 2 ;;
     externalcall) EXTERNAL_CALL=$val; shift 2 ;;
     internalcall) INTERNAL_CALL=$val; shift 2 ;;
+    unknowroute) UNKNOWN_ROUTE=$val; shift 2 ;;
     *) echo "⚠️ Unknown argument: $key"; shift ;;
   esac
 done
@@ -85,7 +87,7 @@ maybe_send_slow() {
   fi
 }
 
-# --- Traced External HTTPBIN methods ---
+# --- External calls with Datadog trace ---
 send_all_httpbin_methods() {
   METHODS=("get" "post" "put" "delete")
 
@@ -100,20 +102,12 @@ send_all_httpbin_methods() {
   done
 }
 
-# --- All Status Code Calls ---
-send_all_status_codes_detailed() {
-  STATUS_CODES=(
-    100 101 102
-    200 201 202 204
-    300 301 302 304
-    400 401 403 404 405 408 422 429
-    500 501 502 503 504
-  )
-
-  for code in "${STATUS_CODES[@]}"; do
-    url="https://httpbin.org/status/$code"
-    echo "🔁 Status $code → $url"
-    curl -s -o /dev/null -w "%{http_code}\n" "$url"
+# --- Unknown route simulation ---
+send_unknown_routes() {
+  for ((i=1; i<=UNKNOWN_ROUTE; i++)); do
+    route="/unknown/path-$RANDOM"
+    echo "🚫 Unknown → $BASE_URL$route"
+    curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL$route"
   done
 }
 
@@ -146,9 +140,12 @@ while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
 
   if [[ "$EXTERNAL_CALL" == "yes" ]]; then
     send_all_httpbin_methods
-    send_all_status_codes_detailed
   else
     echo "❌ Skipping external calls (externalcall=no)"
+  fi
+
+  if [[ "$UNKNOWN_ROUTE" -gt 0 ]]; then
+    send_unknown_routes
   fi
 
   maybe_send_slow
