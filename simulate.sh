@@ -40,34 +40,6 @@ ERROR_ENDPOINTS=(
   "/error/updateFail"
 )
 
-# --- External URLs by Status Code Category ---
-EXTERNAL_SUCCESS=(
-  "https://httpstat.us/200"
-  "https://httpstat.us/201"
-  "https://httpstat.us/204"
-)
-
-EXTERNAL_REDIRECT=(
-  "https://httpstat.us/301"
-  "https://httpstat.us/302"
-)
-
-EXTERNAL_CLIENT_ERROR=(
-  "https://httpstat.us/400"
-  "https://httpstat.us/403"
-  "https://httpstat.us/404"
-)
-
-EXTERNAL_SERVER_ERROR=(
-  "https://httpstat.us/500"
-  "https://httpstat.us/502"
-  "https://httpstat.us/503"
-)
-
-EXTERNAL_TIMEOUT=(
-  "https://httpstat.us/200?sleep=5000"
-)
-
 SLOW_ENDPOINT="/slow/timeout"
 BASE_URL="$SERVER_URL"
 
@@ -102,18 +74,19 @@ maybe_send_slow() {
   fi
 }
 
-# --- Send a random external call by category ---
+# --- Simulate External HTTP Methods using httpbin ---
 send_random_external_request() {
-  case $((RANDOM % 5)) in
-    0) url="${EXTERNAL_SUCCESS[$((RANDOM % ${#EXTERNAL_SUCCESS[@]}))]}"; label="✅ SUCCESS" ;;
-    1) url="${EXTERNAL_REDIRECT[$((RANDOM % ${#EXTERNAL_REDIRECT[@]}))]}"; label="↪️ REDIRECT" ;;
-    2) url="${EXTERNAL_CLIENT_ERROR[$((RANDOM % ${#EXTERNAL_CLIENT_ERROR[@]}))]}"; label="🚫 CLIENT ERROR" ;;
-    3) url="${EXTERNAL_SERVER_ERROR[$((RANDOM % ${#EXTERNAL_SERVER_ERROR[@]}))]}"; label="💥 SERVER ERROR" ;;
-    4) url="${EXTERNAL_TIMEOUT[$((RANDOM % ${#EXTERNAL_TIMEOUT[@]}))]}"; label="🐢 TIMEOUT" ;;
-  esac
+  METHODS=("get" "post" "put" "delete")
+  METHOD=${METHODS[$((RANDOM % 4))]}
+  FAIL_CHANCE=$((RANDOM % 4 == 0))
+  URL="https://httpbin.org/$METHOD"
 
-  echo "$label → $url"
-  curl -s -o /dev/null -w "%{http_code}\n" "$url"
+  if [ $FAIL_CHANCE -eq 1 ]; then
+    URL="https://httpbin.org/status/500"
+  fi
+
+  echo "🔁 External $METHOD → $URL"
+  curl -s -o /dev/null -w "%{http_code}\n" -X $METHOD "$URL"
 }
 
 # --- Main Simulation ---
@@ -133,7 +106,10 @@ while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
       fi
     done
   else
-    echo "⚠️ Skipping internal requests (error=0)"
+    echo "⚠️ Skipping internal error requests (error=0)"
+    for ((i=1; i<=SUCCESS_PERCENT; i++)); do
+      send_random_request SUCCESS_ENDPOINTS
+    done
   fi
 
   if [[ "$EXTERNAL_CALL" == "yes" ]]; then
