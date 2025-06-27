@@ -1,7 +1,10 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
-require('dd-trace').init();
+require('dd-trace').init({
+    runtimeMetrics: true,
+    logInjection: true
+});
 require('newrelic');
 
 const express = require('express');
