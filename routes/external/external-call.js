@@ -1,4 +1,4 @@
-// routes/success/httpbinMethods.js
+// routes/external/external-call.js
 const axios = require('axios');
 const tracer = require('dd-trace').init();
 
@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
     tags: {
       'http.target': url,
       'http.method': method,
-      'type': 'external',
+      'span.type': 'http',
     }
   });
 

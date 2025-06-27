@@ -8,6 +8,7 @@ ROUNDS=-1
 SERVER_CHECK_RETRIES=5
 SERVER_URL="http://localhost:3000"
 EXTERNAL_CALL="no"
+INTERNAL_CALL="yes"
 
 # --- Parse Arguments ---
 while [[ $# -gt 0 ]]; do
@@ -19,16 +20,17 @@ while [[ $# -gt 0 ]]; do
     waitevent) SLEEP_SECONDS=$val; shift 2 ;;
     round) ROUNDS=$val; shift 2 ;;
     externalcall) EXTERNAL_CALL=$val; shift 2 ;;
+    internalcall) INTERNAL_CALL=$val; shift 2 ;;
     *) echo "⚠️ Unknown argument: $key"; shift ;;
   esac
 done
 
 # --- Internal Routes ---
 SUCCESS_ENDPOINTS=(
-  "/success/200"
-  "/success/201"
-  "/success/202"
+  "/success/accepted"
+  "/success/post"
   "/success/update"
+  "/success/delete"
 )
 
 ERROR_ENDPOINTS=(
@@ -38,6 +40,7 @@ ERROR_ENDPOINTS=(
   "/error/custom-span"
   "/error/deleteFail"
   "/error/updateFail"
+  "/error/json"
 )
 
 SLOW_ENDPOINT="/slow/timeout"
@@ -63,7 +66,15 @@ send_random_request() {
   local -n endpoints=$1
   local url="$BASE_URL${endpoints[$((RANDOM % ${#endpoints[@]}))]}"
   echo "🌐 Internal → $url"
-  curl -s -o /dev/null -w "%{http_code}\n" "$url"
+  if [[ "$url" == *"/error/json" ]]; then
+    curl -s -o /dev/null -w "%{http_code}\n" -X POST -H "Content-Type: application/json" -d '{"invalidJson": }' "$url"
+  elif [[ "$url" == *"/success/post" ]]; then
+    curl -s -o /dev/null -w "%{http_code}\n" -X POST "$url"
+  elif [[ "$url" == *"/success/update" ]]; then
+    curl -s -o /dev/null -w "%{http_code}\n" -X PUT "$url"
+  else
+    curl -s -o /dev/null -w "%{http_code}\n" "$url"
+  fi
 }
 
 # --- Optional: slow endpoint ---
@@ -74,19 +85,21 @@ maybe_send_slow() {
   fi
 }
 
-# --- Simulate External HTTP Methods using httpbin ---
-send_random_external_request() {
+# --- Traced External HTTPBIN methods ---
+send_all_httpbin_methods() {
   METHODS=("get" "post" "put" "delete")
-  METHOD=${METHODS[$((RANDOM % 4))]}
-  FAIL_CHANCE=$((RANDOM % 4 == 0))
-  URL="https://httpbin.org/$METHOD"
 
-  if [ $FAIL_CHANCE -eq 1 ]; then
-    URL="https://httpbin.org/status/500"
-  fi
+  for method in "${METHODS[@]}"; do
+    # success call
+    url="$SERVER_URL/outgoing/httpbin-method?method=$method"
+    echo "🌐 External → $url"
+    curl -s -o /dev/null -w "%{http_code}\n" "$url"
 
-  echo "🔁 External $METHOD → $URL"
-  curl -s -o /dev/null -w "%{http_code}\n" -X $METHOD "$URL"
+    # failed call
+    fail_url="$SERVER_URL/outgoing/httpbin-method?method=$method&fail=true"
+    echo "💥 External FAIL → $fail_url"
+    curl -s -o /dev/null -w "%{http_code}\n" "$fail_url"
+  done
 }
 
 # --- Main Simulation ---
@@ -96,26 +109,30 @@ current_round=0
 while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
   echo -e "\n🔁 Round $((current_round+1)) @ $(date)"
 
-  if [ "$ERROR_REQUESTS" -gt 0 ]; then
-    for ((i=1; i<=ERROR_REQUESTS; i++)); do
-      CHANCE=$((RANDOM % 100))
-      if [ $CHANCE -lt $SUCCESS_PERCENT ]; then
+  if [[ "$INTERNAL_CALL" == "yes" ]]; then
+    if [ "$ERROR_REQUESTS" -gt 0 ]; then
+      for ((i=1; i<=ERROR_REQUESTS; i++)); do
+        CHANCE=$((RANDOM % 100))
+        if [ $CHANCE -lt $SUCCESS_PERCENT ]; then
+          send_random_request SUCCESS_ENDPOINTS
+        else
+          send_random_request ERROR_ENDPOINTS
+        fi
+      done
+    else
+      echo "⚠️ Skipping internal error requests (error=0)"
+      for ((i=1; i<=SUCCESS_PERCENT; i++)); do
         send_random_request SUCCESS_ENDPOINTS
-      else
-        send_random_request ERROR_ENDPOINTS
-      fi
-    done
+      done
+    fi
   else
-    echo "⚠️ Skipping internal error requests (error=0)"
-    for ((i=1; i<=SUCCESS_PERCENT; i++)); do
-      send_random_request SUCCESS_ENDPOINTS
-    done
+    echo "❌ Skipping internal calls (internalcall=no)"
   fi
 
   if [[ "$EXTERNAL_CALL" == "yes" ]]; then
-    send_random_external_request
+    send_all_httpbin_methods
   else
-    echo "❌ Skipping external call (externalcall=no)"
+    echo "❌ Skipping external calls (externalcall=no)"
   fi
 
   maybe_send_slow
@@ -123,6 +140,7 @@ while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
   echo "⏱ Sleeping $SLEEP_SECONDS seconds..."
   sleep $SLEEP_SECONDS
   current_round=$((current_round + 1))
+
 done
 
 echo "✅ Simulation completed."

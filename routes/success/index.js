@@ -1,9 +1,8 @@
 module.exports = {
-  ok: require('./ok200'),
-  created: require('./created201'),
   accepted: require('./accepted202'),
   outgoing: require('./outgoingExample'),
   httpbinMethods: require('./httpbinMethods'),
-  updatePut: require('./updatePut'),
-  delete: require('./delete')
+  delete: require('./delete'),
+  put: require('./put-200'),
+  post: require('./post-201')
 };
