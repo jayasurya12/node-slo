@@ -18,7 +18,7 @@ while [[ $# -gt 0 ]]; do
     success) SUCCESS_PERCENT=$val; shift 2 ;;
     error) ERROR_REQUESTS=$val; shift 2 ;;
     waitevent) SLEEP_SECONDS=$val; shift 2 ;;
-    round) ROUNDS=$val; shift 2 ;;
+    round|ROUNDS) ROUNDS=$val; shift 2 ;;
     externalcall) EXTERNAL_CALL=$val; shift 2 ;;
     internalcall) INTERNAL_CALL=$val; shift 2 ;;
     *) echo "⚠️ Unknown argument: $key"; shift ;;
@@ -90,15 +90,30 @@ send_all_httpbin_methods() {
   METHODS=("get" "post" "put" "delete")
 
   for method in "${METHODS[@]}"; do
-    # success call
     url="$SERVER_URL/outgoing/httpbin-method?method=$method"
     echo "🌐 External → $url"
     curl -s -o /dev/null -w "%{http_code}\n" "$url"
 
-    # failed call
     fail_url="$SERVER_URL/outgoing/httpbin-method?method=$method&fail=true"
     echo "💥 External FAIL → $fail_url"
     curl -s -o /dev/null -w "%{http_code}\n" "$fail_url"
+  done
+}
+
+# --- All Status Code Calls ---
+send_all_status_codes_detailed() {
+  STATUS_CODES=(
+    100 101 102
+    200 201 202 204
+    300 301 302 304
+    400 401 403 404 405 408 422 429
+    500 501 502 503 504
+  )
+
+  for code in "${STATUS_CODES[@]}"; do
+    url="https://httpbin.org/status/$code"
+    echo "🔁 Status $code → $url"
+    curl -s -o /dev/null -w "%{http_code}\n" "$url"
   done
 }
 
@@ -131,6 +146,7 @@ while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
 
   if [[ "$EXTERNAL_CALL" == "yes" ]]; then
     send_all_httpbin_methods
+    send_all_status_codes_detailed
   else
     echo "❌ Skipping external calls (externalcall=no)"
   fi
@@ -140,7 +156,6 @@ while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
   echo "⏱ Sleeping $SLEEP_SECONDS seconds..."
   sleep $SLEEP_SECONDS
   current_round=$((current_round + 1))
-
 done
 
 echo "✅ Simulation completed."
