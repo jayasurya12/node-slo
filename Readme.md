@@ -43,12 +43,12 @@ curl -X POST http://localhost:3000/error/json \
   -H "Content-Type: application/json" \
   -d '{"bad": }'
 
-./simulator.sh                               # Default simulation
-./simulator.sh success 90                    # 90% success rate
-./simulator.sh success 90 error 10           # 90% success, 10 requests per round
-./simulator.sh success 90 error 10 waitevent 2 round 20
-./simulator.sh success 90 error 10 waitevent 2 round 20 externalcall no # Only success
-./simulator.sh success 90 error 10 waitevent 2 round 10 externalcall yes # Mixed traffic with external call
+./simulate.sh                               # Default simulation
+./simulate.sh success 90                    # 90% success rate
+./simulate.sh success 90 error 10           # 90% success, 10 requests per round
+./simulate.sh success 90 error 10 waitevent 2 round 20
+./simulate.sh success 90 error 10 waitevent 2 round 20 externalcall no # Only success
+./simulate.sh success 90 error 10 waitevent 2 round 10 externalcall yes # Mixed traffic with external call
 
 project-root/
 ├── app.js
