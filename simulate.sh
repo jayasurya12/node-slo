@@ -9,7 +9,7 @@ SERVER_CHECK_RETRIES=5
 SERVER_URL="http://localhost:3000"
 EXTERNAL_CALL="no"
 
-# --- Argument Parsing ---
+# --- Parse Arguments ---
 while [[ $# -gt 0 ]]; do
   key="$1"
   val="$2"
@@ -23,7 +23,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# --- Endpoint Arrays ---
+# --- Internal Routes ---
 SUCCESS_ENDPOINTS=(
   "/success/200"
   "/success/201"
@@ -40,6 +40,7 @@ ERROR_ENDPOINTS=(
   "/error/updateFail"
 )
 
+# --- External URLs by Status Code Category ---
 EXTERNAL_SUCCESS=(
   "https://httpstat.us/200"
   "https://httpstat.us/201"
@@ -70,7 +71,7 @@ EXTERNAL_TIMEOUT=(
 SLOW_ENDPOINT="/slow/timeout"
 BASE_URL="$SERVER_URL"
 
-# --- Server Readiness Check ---
+# --- Check if server is up ---
 check_server_ready() {
   for ((i=1; i<=SERVER_CHECK_RETRIES; i++)); do
     code=$(curl -s -o /dev/null -w "%{http_code}" "$SERVER_URL")
@@ -85,27 +86,15 @@ check_server_ready() {
   exit 1
 }
 
-# --- Core Request Functions ---
+# --- Send one request to random internal success/error endpoint ---
 send_random_request() {
   local -n endpoints=$1
   local url="$BASE_URL${endpoints[$((RANDOM % ${#endpoints[@]}))]}"
-  echo "🌐 Request → $url"
+  echo "🌐 Internal → $url"
   curl -s -o /dev/null -w "%{http_code}\n" "$url"
 }
 
-random_method_httpbin_call() {
-  methods=("get" "post" "put" "delete")
-  method=${methods[$((RANDOM % 4))]}
-  fail=$((RANDOM % 4 == 0))
-  url="$BASE_URL/outgoing/httpbin-method?method=$method"
-  emoji=("🔍" "➕" "✏️" "🗑️")
-  icon=${emoji[$((RANDOM % 4))]}
-
-  [ $fail -eq 1 ] && url="$url&fail=true" && icon="❌ $icon"
-  echo "$icon HTTPBIN METHOD → $url"
-  curl -s -o /dev/null -w "%{http_code}\n" "$url" &
-}
-
+# --- Optional: slow endpoint ---
 maybe_send_slow() {
   if [ $((RANDOM % 10)) -eq 0 ]; then
     echo "🐢 Slow → $BASE_URL$SLOW_ENDPOINT"
@@ -113,28 +102,14 @@ maybe_send_slow() {
   fi
 }
 
+# --- Send a random external call by category ---
 send_random_external_request() {
   case $((RANDOM % 5)) in
-    0)
-      url="${EXTERNAL_SUCCESS[$((RANDOM % ${#EXTERNAL_SUCCESS[@]}))]}"
-      label="✅ SUCCESS"
-      ;;
-    1)
-      url="${EXTERNAL_REDIRECT[$((RANDOM % ${#EXTERNAL_REDIRECT[@]}))]}"
-      label="↪️ REDIRECT"
-      ;;
-    2)
-      url="${EXTERNAL_CLIENT_ERROR[$((RANDOM % ${#EXTERNAL_CLIENT_ERROR[@]}))]}"
-      label="🚫 CLIENT ERROR"
-      ;;
-    3)
-      url="${EXTERNAL_SERVER_ERROR[$((RANDOM % ${#EXTERNAL_SERVER_ERROR[@]}))]}"
-      label="💥 SERVER ERROR"
-      ;;
-    4)
-      url="${EXTERNAL_TIMEOUT[$((RANDOM % ${#EXTERNAL_TIMEOUT[@]}))]}"
-      label="🐢 TIMEOUT"
-      ;;
+    0) url="${EXTERNAL_SUCCESS[$((RANDOM % ${#EXTERNAL_SUCCESS[@]}))]}"; label="✅ SUCCESS" ;;
+    1) url="${EXTERNAL_REDIRECT[$((RANDOM % ${#EXTERNAL_REDIRECT[@]}))]}"; label="↪️ REDIRECT" ;;
+    2) url="${EXTERNAL_CLIENT_ERROR[$((RANDOM % ${#EXTERNAL_CLIENT_ERROR[@]}))]}"; label="🚫 CLIENT ERROR" ;;
+    3) url="${EXTERNAL_SERVER_ERROR[$((RANDOM % ${#EXTERNAL_SERVER_ERROR[@]}))]}"; label="💥 SERVER ERROR" ;;
+    4) url="${EXTERNAL_TIMEOUT[$((RANDOM % ${#EXTERNAL_TIMEOUT[@]}))]}"; label="🐢 TIMEOUT" ;;
   esac
 
   echo "$label → $url"
@@ -161,14 +136,13 @@ while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
     echo "⚠️ Skipping internal requests (error=0)"
   fi
 
-  random_method_httpbin_call
-  maybe_send_slow
-
   if [[ "$EXTERNAL_CALL" == "yes" ]]; then
     send_random_external_request
   else
     echo "❌ Skipping external call (externalcall=no)"
   fi
+
+  maybe_send_slow
 
   echo "⏱ Sleeping $SLEEP_SECONDS seconds..."
   sleep $SLEEP_SECONDS
