@@ -1,14 +1,18 @@
 #!/bin/bash
 
-# --- Default Values ---
-SUCCESS_PERCENT=70
-ERROR_REQUESTS=10
-SLEEP_SECONDS=5
-ROUNDS=-1  # -1 means infinite loop
-SERVER_CHECK_RETRIES=5
+# --- Default Config Values ---
+SUCCESS_PERCENT=70      # % of requests that should succeed
+ERROR_REQUESTS=10       # Number of requests per round
+SLEEP_SECONDS=5         # Time to wait between rounds (in seconds)
+ROUNDS=-1               # Number of rounds (-1 = infinite)
+SERVER_CHECK_RETRIES=5  # How many times to check if the server is up before giving up
 SERVER_URL="http://localhost:3000"
+EXTERNAL_CALL="no"      # Whether to send external API calls (yes or no)
 
-# --- Parse Named Arguments ---
+# --- Parse CLI Arguments ---
+# Example usage:
+# ./simulator.sh success 90 error 10 waitevent 2 round 20 externalcall yes
+
 for ((i=1; i<=$#; i++)); do
   arg=${!i}
   next=$((i+1))
@@ -27,10 +31,15 @@ for ((i=1; i<=$#; i++)); do
     round)
       ROUNDS=$val
       ;;
+    externalcall)
+      EXTERNAL_CALL=$val
+      ;;
   esac
 done
 
-# --- Internals ---
+# --- Endpoints Lists ---
+
+# Successful endpoints to simulate success requests
 SUCCESS_ENDPOINTS=(
   "/success/200"
   "/success/201"
@@ -41,6 +50,7 @@ SUCCESS_ENDPOINTS=(
   "/outgoing/delete"
 )
 
+# Error endpoints to simulate error requests
 ERROR_ENDPOINTS=(
   "/error/unhandled"
   "/error/handled"
@@ -50,11 +60,19 @@ ERROR_ENDPOINTS=(
   "/error/updateFail"
 )
 
+# External URLs for optional external simulation
+EXTERNAL_ENDPOINTS=(
+  "https://httpbin.org/get"
+  "https://jsonplaceholder.typicode.com/posts"
+  "https://jsonplaceholder.typicode.com/comments"
+  "https://httpstat.us/500"
+  "https://httpstat.us/200?sleep=2000"
+)
+
 SLOW_ENDPOINT="/slow/timeout"
 BASE_URL="$SERVER_URL"
 
-# --- Functions ---
-
+# --- Check if the local server is ready before starting the test ---
 check_server_ready() {
   for ((i=1; i<=SERVER_CHECK_RETRIES; i++)); do
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$SERVER_URL")
@@ -70,6 +88,7 @@ check_server_ready() {
   exit 1
 }
 
+# --- Function to randomly send a success or error request ---
 send_random_request() {
   local -n endpoints=$1
   local index=$((RANDOM % ${#endpoints[@]}))
@@ -85,6 +104,7 @@ send_random_request() {
   curl -s -o /dev/null -w "%{http_code}\n" "$full_url"
 }
 
+# --- Simulate outgoing HTTP requests with various methods (GET, POST, etc.) ---
 random_method_httpbin_call() {
   METHODS=("get" "post" "put" "delete")
   METHOD=${METHODS[$((RANDOM % 4))]}
@@ -99,18 +119,17 @@ random_method_httpbin_call() {
     delete) EMOJI="🗑️";;
   esac
 
-  FAIL_ICON=""
   if [ $SHOULD_FAIL -eq 1 ]; then
     URL="$URL&fail=true"
-    FAIL_ICON="❌"
+    echo "$EMOJI [HTTPBIN $METHOD] ❌ → $URL"
   else
-    FAIL_ICON="✅"
+    echo "$EMOJI [HTTPBIN $METHOD] ✅ → $URL"
   fi
 
-  echo "$EMOJI [HTTPBIN $METHOD] $FAIL_ICON → $URL"
   curl -s -o /dev/null -w "%{http_code}\n" "$URL" &
 }
 
+# --- Occasionally simulate a slow endpoint ---
 maybe_send_slow() {
   local chance=$((RANDOM % 10))
   if [ $chance -eq 0 ]; then
@@ -119,7 +138,15 @@ maybe_send_slow() {
   fi
 }
 
-# --- Execution ---
+# --- Simulate one random external API call ---
+send_random_external_request() {
+  local index=$((RANDOM % ${#EXTERNAL_ENDPOINTS[@]}))
+  local url="${EXTERNAL_ENDPOINTS[$index]}"
+  echo "🌐 [EXTERNAL] → $url"
+  curl -s -o /dev/null -w "%{http_code}\n" "$url"
+}
+
+# --- Begin Simulation ---
 check_server_ready
 
 current_round=0
@@ -127,6 +154,7 @@ while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
   echo ""
   echo "🔁 Round $((current_round+1)) @ $(date)"
 
+  # Send multiple requests based on success/error chance
   for ((i=1; i<=ERROR_REQUESTS; i++)); do
     CHANCE=$((RANDOM % 100))
     if [ $CHANCE -lt $SUCCESS_PERCENT ]; then
@@ -136,8 +164,16 @@ while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
     fi
   done
 
+  # Simulate random method HTTP request
   random_method_httpbin_call
+
+  # Occasionally simulate slow response
   maybe_send_slow
+
+  # Optionally call external services
+  if [[ "$EXTERNAL_CALL" == "yes" ]]; then
+    send_random_external_request
+  fi
 
   echo "⏱ Sleeping for $SLEEP_SECONDS seconds..."
   sleep $SLEEP_SECONDS

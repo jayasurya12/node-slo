@@ -43,7 +43,11 @@ curl -X POST http://localhost:3000/error/json \
   -H "Content-Type: application/json" \
   -d '{"bad": }'
 
-./simulate.sh success 90 error 5 waitevent 5 round 3
+./simulator.sh                               # Default simulation
+./simulator.sh success 90                    # 90% success rate
+./simulator.sh success 90 error 10           # 90% success, 10 requests per round
+./simulator.sh success 90 error 10 waitevent 2 round 20
+./simulator.sh success 90 error 10 waitevent 2 round 20 externalcall yes
 
 
 
