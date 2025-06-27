@@ -51,6 +51,8 @@ curl -X POST http://localhost:3000/error/json \
 ./simulator.sh success 90 error 10 waitevent 2 round 10 externalcall yes # Mixed traffic with external call
 
 
+./simulator.sh success 80 error 20 waitevent 2 round 10 internalcall yes externalcall yes
+
 project-root/
 ├── app.js
 ├── package.json
