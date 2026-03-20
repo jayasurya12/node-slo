@@ -38,19 +38,41 @@ app.use((req, res, next) => {
 // 🌐 Homepages
 app.get('/', (req, res) => {
   res.send(`
-    <h2>Success Routes</h2>
+    <h1>🚀 SLO Testing Application</h1>
+    <p>Enterprise-grade Node.js app for testing SLO/SLI with Datadog, New Relic, and Atatus</p>
+
+    <h2>✅ Success Routes</h2>
     <ul>
-      <li><a href="/success/200">/success/200</a></li>
-      <li><a href="/success/201">/success/201</a></li>
-      <li><a href="/success/202">/success/202</a></li>
+      <li><a href="/success/200">/success/200</a> - GET success with JSON response</li>
+      <li><a href="/success/accepted">/success/accepted</a> - 202 Accepted</li>
+      <li><a href="/success/delete">/success/delete</a> - DELETE success</li>
+      <li>POST <code>/success/post</code> - Create resource (201)</li>
+      <li>PUT <code>/success/update</code> - Update resource (200)</li>
     </ul>
-    <h2>Error Routes</h2>
+
+    <h2>❌ Error Routes</h2>
     <ul>
-      <li><a href="/error/unhandled">/error/unhandled</a></li>
-      <li><a href="/error/handled">/error/handled</a></li>
-      <li><a href="/error/async">/error/async</a></li>
-      <li><a href="/error/custom-span">/error/custom-span</a></li>
-      <li>POST to <code>/error/json</code> with invalid JSON using curl</li>
+      <li><a href="/error/unhandled">/error/unhandled</a> - Throws unhandled exception</li>
+      <li><a href="/error/handled">/error/handled</a> - Returns 500 error</li>
+      <li><a href="/error/async">/error/async> - Async Promise rejection</li>
+      <li><a href="/error/custom-span">/error/custom-span</a> - Custom Datadog span error</li>
+      <li><a href="/error/deleteFail">/error/deleteFail</a> - DELETE failure</li>
+      <li><a href="/error/updateFail">/error/updateFail</a> - PUT failure</li>
+      <li>POST <code>/error/json</code> with invalid JSON - JSON parse error</li>
+    </ul>
+
+    <h2>🌐 External & Slow Routes</h2>
+    <ul>
+      <li><a href="/outgoing/httpbin">/outgoing/httpbin</a> - External HTTP call to httpbin.org</li>
+      <li><a href="/outgoing/httpbin?fail=true">/outgoing/httpbin?fail=true</a> - Simulated external failure</li>
+      <li><a href="/slow/timeout">/slow/timeout</a> - 2-minute delay (timeout test)</li>
+    </ul>
+
+    <h2>📊 Monitoring Endpoints</h2>
+    <ul>
+      <li><a href="/health">/health</a> - Health check (liveness probe)</li>
+      <li><a href="/ready">/ready</a> - Readiness check</li>
+      <li><a href="/metrics">/metrics</a> - Request counters</li>
     </ul>
   `);
 });
@@ -59,6 +81,7 @@ app.get('/', (req, res) => {
 app.get('/slow/timeout', require('./routes/slow/timeout'));
 
 // ✅ Success Routes
+app.get('/success/200', successRoutes.get200);
 app.get('/success/accepted', successRoutes.accepted);
 app.get('/success/delete', successRoutes.delete);
 app.post('/success/post', successRoutes.post);
@@ -66,6 +89,12 @@ app.put('/success/update', successRoutes.put);
 
 // 🌐 External Routes
 app.get('/outgoing/httpbin', externalCalls.httpbin);
+
+// ❌ JSON Parse Error Route
+app.post('/error/json', (req, res) => {
+  // This route only runs if JSON parsing succeeds
+  res.status(200).json({ message: 'Valid JSON received', body: req.body });
+});
 
 // ❌ Error Routes
 app.get('/error/unhandled', errorRoutes.unhandled);
@@ -75,13 +104,31 @@ app.get('/error/custom-span', errorRoutes.customSpan);
 app.get('/error/deleteFail', errorRoutes.deleteFail);
 app.get('/error/updateFail', errorRoutes.updateFail);
 
-app.post('/error/json', errorRoutes.json, (req, res) => {
-  res.send('Valid JSON received');
-});
-
 // 📊 Metrics Route
 app.get('/metrics', (req, res) => {
   res.json(getCounts());
+});
+
+// 🏥 Health Check Endpoints
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    version: process.env.DD_VERSION || '1.0.0'
+  });
+});
+
+app.get('/ready', (req, res) => {
+  res.status(200).json({
+    status: 'ready',
+    timestamp: new Date().toISOString(),
+    checks: {
+      server: 'up',
+      memory: process.memoryUsage().heapUsed < 500 * 1024 * 1024 ? 'ok' : 'critical'
+    }
+  });
 });
 
 // ⛔️ 404 Handler

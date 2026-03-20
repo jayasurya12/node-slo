@@ -1,4 +1,5 @@
 module.exports = {
+  get200: require('./get-200'),
   accepted: require('./accepted202'),
   outgoing: require('./outgoingExample'),
   delete: require('./delete'),

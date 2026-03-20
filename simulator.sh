@@ -1,158 +1,158 @@
 #!/bin/bash
 
-# --- Default Config ---
-SUCCESS_PERCENT=70
-ERROR_REQUESTS=10
-SLEEP_SECONDS=5
-ROUNDS=-1
-SERVER_CHECK_RETRIES=5
-SERVER_URL="http://localhost:3000"
-EXTERNAL_CALL="no"
-INTERNAL_CALL="yes"
-UNKNOWN_ROUTE=0
+# Enterprise SLO Testing Simulator
+# Tests all endpoints and generates load for SLO monitoring
 
-# --- Parse Arguments ---
-while [[ $# -gt 0 ]]; do
-  key="$1"
-  val="$2"
-  case "$key" in
-    success) SUCCESS_PERCENT=$val; shift 2 ;;
-    error) ERROR_REQUESTS=$val; shift 2 ;;
-    waitevent) SLEEP_SECONDS=$val; shift 2 ;;
-    round) ROUNDS=$val; shift 2 ;;
-    externalcall) EXTERNAL_CALL=$val; shift 2 ;;
-    internalcall) INTERNAL_CALL=$val; shift 2 ;;
-    unknowroute) UNKNOWN_ROUTE=$val; shift 2 ;;
-    *) echo "⚠️ Unknown argument: $key"; shift ;;
-  esac
-done
+set -e
 
-# --- Internal Routes ---
-SUCCESS_ENDPOINTS=(
-  "/success/accepted"
-  "/success/post"
-  "/success/update"
-  "/success/delete"
-)
+BASE_URL="${BASE_URL:-http://localhost:3000}"
+REQUESTS="${REQUESTS:-100}"
+CONCURRENT="${CONCURRENT:-10}"
+DELAY="${DELAY:-0.1}"
 
-ERROR_ENDPOINTS=(
-  "/error/unhandled"
-  "/error/handled"
-  "/error/async"
-  "/error/custom-span"
-  "/error/deleteFail"
-  "/error/updateFail"
-  "/error/json"
-)
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-SLOW_ENDPOINT="/slow/timeout"
-BASE_URL="$SERVER_URL"
+echo -e "${GREEN}╔══════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║         Enterprise SLO Testing Simulator                 ║${NC}"
+echo -e "${GREEN}╚══════════════════════════════════════════════════════════╝${NC}"
+echo ""
+echo "Configuration:"
+echo "  Base URL:   $BASE_URL"
+echo "  Requests:   $REQUESTS"
+echo "  Concurrent: $CONCURRENT"
+echo "  Delay:      ${DELAY}s"
+echo ""
 
-# --- Check if server is up ---
-check_server_ready() {
-  for ((i=1; i<=SERVER_CHECK_RETRIES; i++)); do
-    code=$(curl -s -o /dev/null -w "%{http_code}" "$SERVER_URL")
-    if [[ "$code" =~ ^2|3 ]]; then
-      echo "✅ Server ready at $SERVER_URL"
-      return 0
-    fi
-    echo "⏳ Waiting for server... ($i/$SERVER_CHECK_RETRIES)"
-    sleep 2
-  done
-  echo "❌ Server not ready. Exiting."
-  exit 1
-}
+# Check if server is running
+echo -n "Checking server health... "
+if ! curl -sf "${BASE_URL}/health" > /dev/null 2>&amp;1; then
+    echo -e "${RED}FAILED${NC}"
+    echo "Server not responding at $BASE_URL"
+    echo "Start the server with: npm start"
+    exit 1
+fi
+echo -e "${GREEN}OK${NC}"
 
-# --- Send one request to random internal success/error endpoint ---
-send_random_request() {
-  local -n endpoints=$1
-  local url="$BASE_URL${endpoints[$((RANDOM % ${#endpoints[@]}))]}"
-  echo "🌐 Internal → $url"
-  if [[ "$url" == *"/error/json" ]]; then
-    curl -s -o /dev/null -w "%{http_code}\n" -X POST -H "Content-Type: application/json" -d '{"invalidJson": }' "$url"
-  elif [[ "$url" == *"/success/post" ]]; then
-    curl -s -o /dev/null -w "%{http_code}\n" -X POST "$url"
-  elif [[ "$url" == *"/success/update" ]]; then
-    curl -s -o /dev/null -w "%{http_code}\n" -X PUT "$url"
-  else
-    curl -s -o /dev/null -w "%{http_code}\n" "$url"
-  fi
-}
+# Test endpoints one by one
+test_endpoint() {
+    local method=$1
+    local endpoint=$2
+    local expected=$3
+    local description=$4
 
-# --- Optional: slow endpoint ---
-maybe_send_slow() {
-  if [ $((RANDOM % 10)) -eq 0 ]; then
-    echo "🐢 Slow → $BASE_URL$SLOW_ENDPOINT"
-    curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL$SLOW_ENDPOINT" &
-  fi
-}
+    local url="${BASE_URL}${endpoint}"
+    local response
+    local status
 
-# --- External calls with Datadog trace ---
-send_all_httpbin_methods() {
-  METHODS=("get" "post" "put" "delete")
-
-  for method in "${METHODS[@]}"; do
-    url="$SERVER_URL/outgoing/httpbin-method?method=$method"
-    echo "🌐 External → $url"
-    curl -s -o /dev/null -w "%{http_code}\n" "$url"
-
-    fail_url="$SERVER_URL/outgoing/httpbin-method?method=$method&fail=true"
-    echo "💥 External FAIL → $fail_url"
-    curl -s -o /dev/null -w "%{http_code}\n" "$fail_url"
-  done
-}
-
-# --- Unknown route simulation ---
-send_unknown_routes() {
-  for ((i=1; i<=UNKNOWN_ROUTE; i++)); do
-    route="/unknown/path-$RANDOM"
-    echo "🚫 Unknown → $BASE_URL$route"
-    curl -s -o /dev/null -w "%{http_code}\n" "$BASE_URL$route"
-  done
-}
-
-# --- Main Simulation ---
-check_server_ready
-current_round=0
-
-while [[ $ROUNDS -eq -1 || $current_round -lt $ROUNDS ]]; do
-  echo -e "\n🔁 Round $((current_round+1)) @ $(date)"
-
-  if [[ "$INTERNAL_CALL" == "yes" ]]; then
-    if [ "$ERROR_REQUESTS" -gt 0 ]; then
-      for ((i=1; i<=ERROR_REQUESTS; i++)); do
-        CHANCE=$((RANDOM % 100))
-        if [ $CHANCE -lt $SUCCESS_PERCENT ]; then
-          send_random_request SUCCESS_ENDPOINTS
-        else
-          send_random_request ERROR_ENDPOINTS
-        fi
-      done
+    if [ "$method" = "POST" ] || [ "$method" = "PUT" ]; then
+        response=$(curl -s -w "\n%{http_code}" -X "$method" -H "Content-Type: application/json" -d '{"test":"data"}' "$url" 2>/dev/null || echo -e "\n000")
     else
-      echo "⚠️ Skipping internal error requests (error=0)"
-      for ((i=1; i<=SUCCESS_PERCENT; i++)); do
-        send_random_request SUCCESS_ENDPOINTS
-      done
+        response=$(curl -s -w "\n%{http_code}" -X "$method" "$url" 2>/dev/null || echo -e "\n000")
     fi
-  else
-    echo "❌ Skipping internal calls (internalcall=no)"
-  fi
 
-  if [[ "$EXTERNAL_CALL" == "yes" ]]; then
-    send_all_httpbin_methods
-  else
-    echo "❌ Skipping external calls (externalcall=no)"
-  fi
+    status=$(echo "$response" | tail -n1)
 
-  if [[ "$UNKNOWN_ROUTE" -gt 0 ]]; then
-    send_unknown_routes
-  fi
+    if [ "$status" = "$expected" ]; then
+        echo -e "${GREEN}✓${NC} $method $endpoint - $description"
+    else
+        echo -e "${RED}✗${NC} $method $endpoint - Expected $expected, got $status"
+    fi
+}
 
-  maybe_send_slow
+echo ""
+echo "Testing endpoints..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-  echo "⏱ Sleeping $SLEEP_SECONDS seconds..."
-  sleep $SLEEP_SECONDS
-  current_round=$((current_round + 1))
-done
+# Success routes
+test_endpoint "GET" "/success/200" "200" "GET success"
+test_endpoint "GET" "/success/accepted" "202" "Accepted"
+test_endpoint "GET" "/success/delete" "200" "DELETE success"
+test_endpoint "POST" "/success/post" "201" "POST success"
+test_endpoint "PUT" "/success/update" "200" "PUT success"
 
-echo "✅ Simulation completed."
+# Error routes
+test_endpoint "GET" "/error/handled" "500" "Handled error"
+test_endpoint "GET" "/error/deleteFail" "500" "DELETE failure"
+test_endpoint "GET" "/error/updateFail" "500" "PUT failure"
+test_endpoint "GET" "/error/custom-span" "500" "Custom span error"
+
+# External and slow
+test_endpoint "GET" "/outgoing/httpbin" "200" "External HTTP call"
+test_endpoint "GET" "/outgoing/httpbin?fail=true" "500" "External failure"
+
+# Health checks
+test_endpoint "GET" "/health" "200" "Health check"
+test_endpoint "GET" "/ready" "200" "Readiness check"
+test_endpoint "GET" "/metrics" "200" "Metrics"
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Generate load if hey or ab is available
+generate_load() {
+    echo "Generating load: $REQUESTS requests with $CONCURRENT concurrent connections..."
+
+    if command -v hey &> /dev/null; then
+        hey -n "$REQUESTS" -c "$CONCURRENT" -m GET "${BASE_URL}/success/200" > /dev/null 2>&amp;1
+    elif command -v ab &> /dev/null; then
+        ab -n "$REQUESTS" -c "$CONCURRENT" "${BASE_URL}/success/200" > /dev/null 2>&amp;1
+    else
+        echo "Installing load generation tools..."
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update > /dev/null 2>&amp;1 && sudo apt-get install -y apache2-utils > /dev/null 2>&amp;1
+        elif command -v yum &> /dev/null; then
+            sudo yum install -y httpd-tools > /dev/null 2>&amp;1
+        fi
+
+        # Fallback to curl loop
+        echo "Using curl for load generation (slower)..."
+        for i in $(seq 1 "$REQUESTS"); do
+            curl -sf "${BASE_URL}/success/200" > /dev/null &
+            if [ $((i % CONCURRENT)) -eq 0 ]; then
+                wait
+            fi
+        done
+        wait
+    fi
+
+    echo -e "${GREEN}Load generation complete${NC}"
+}
+
+# Menu
+case "${1:-test}" in
+    test)
+        echo "Basic testing complete!"
+        ;;
+    load)
+        generate_load
+        ;;
+    full)
+        generate_load
+        echo ""
+        echo "Simulating error scenarios..."
+        for i in {1..10}; do
+            curl -sf "${BASE_URL}/error/handled" > /dev/null &
+            curl -sf "${BASE_URL}/error/custom-span" > /dev/null &
+            wait
+        done
+        echo -e "${GREEN}Error simulation complete${NC}"
+        ;;
+    *)
+        echo "Usage: $0 [test|load|full]"
+        echo "  test - Run endpoint tests (default)"
+        echo "  load - Generate traffic load"
+        echo "  full - Run tests + load + error simulation"
+        exit 1
+        ;;
+esac
+
+echo ""
+echo "Current metrics:"
+curl -sf "${BASE_URL}/metrics" | python3 -m json.tool 2>/dev/null || curl -sf "${BASE_URL}/metrics"
+echo ""
+echo -e "${GREEN}Done!${NC}"

@@ -3,7 +3,6 @@ module.exports = {
   unhandled: require('./unhandledError'),
   async: require('./asyncError'),
   customSpan: require('./customSpanError'),
-  json: require('./jsonError'),
   deleteFail: require('./deleteFail'),
   updateFail: require('./updateFail')
 };

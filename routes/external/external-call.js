@@ -1,6 +1,6 @@
 // routes/external/external-call.js
 const axios = require('axios');
-const tracer = require('dd-trace').init();
+const tracer = require('dd-trace');
 
 module.exports = async (req, res) => {
   const method = req.query.method?.toUpperCase() || 'GET';
@@ -10,7 +10,7 @@ module.exports = async (req, res) => {
     ? `https://httpbin.org/status/500`
     : `https://httpbin.org/${method.toLowerCase()}`;
 
-  const span = tracer.trace(`httpbin.${method.toLowerCase()}`, {
+  const span = tracer.startSpan(`httpbin.${method.toLowerCase()}`, {
     resource: `httpbin/${method}`,
     tags: {
       'http.target': url,
