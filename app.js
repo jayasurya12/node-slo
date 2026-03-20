@@ -12,7 +12,7 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3500;
 
 const { increaseIncoming, getCounts } = require('./utils/counter');
 const successRoutes = require('./routes/success');
@@ -121,6 +121,9 @@ app.get('/ready', (req, res) => {
   });
 });
 
+function isFastStar(layer) {
+  return layer.regexp.fast_star  // ← `layer.regexp` is undefined in Express v5
+}
 // 404 Handler
 app.use((req, res, next) => {
   console.warn(`🚫 404 Not Found: ${req.method} ${req.url}`);
