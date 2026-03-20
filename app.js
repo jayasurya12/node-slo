@@ -1,3 +1,10 @@
+// ⚠️ APM agents MUST be initialized before any other require
+require('dd-trace').init({
+  runtimeMetrics: true,
+  logInjection: true,
+});
+require('newrelic');
+
 const dotenv = require('dotenv');
 dotenv.config();
 
