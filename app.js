@@ -1,12 +1,6 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
-require('dd-trace').init({
-    runtimeMetrics: true,
-    logInjection: true
-});
-require('newrelic');
-
 const express = require('express');
 const app = express();
 app.use(express.json());
@@ -18,24 +12,14 @@ const successRoutes = require('./routes/success');
 const errorRoutes = require('./routes/errors');
 const externalCalls = require('./routes/external');
 
-// 🔍 Tagging requests with Datadog APM custom tags
-app.use((req, res, next) => {
-  const span = require('dd-trace').scope().active();
-  if (span) {
-    span.setTag('http.method', req.method);
-    span.setTag('http.route', req.path);
-  }
-  next();
-});
-
-// 🧮 Incoming request count
+// Incoming request count
 app.use((req, res, next) => {
   const current = increaseIncoming();
   console.log(`📥 Incoming: ${req.method} ${req.url} | Total: ${current}`);
   next();
 });
 
-// 🌐 Homepages
+// Homepages
 app.get('/', (req, res) => {
   res.send(`
     <h1>🚀 SLO Testing Application</h1>
@@ -77,26 +61,25 @@ app.get('/', (req, res) => {
   `);
 });
 
-// 🐢 Slow Route
+// Slow Route
 app.get('/slow/timeout', require('./routes/slow/timeout'));
 
-// ✅ Success Routes
+// Success Routes
 app.get('/success/200', successRoutes.get200);
 app.get('/success/accepted', successRoutes.accepted);
 app.get('/success/delete', successRoutes.delete);
 app.post('/success/post', successRoutes.post);
 app.put('/success/update', successRoutes.put);
 
-// 🌐 External Routes
+// External Routes
 app.get('/outgoing/httpbin', externalCalls.httpbin);
 
-// ❌ JSON Parse Error Route
+// JSON Parse Error Route
 app.post('/error/json', (req, res) => {
-  // This route only runs if JSON parsing succeeds
   res.status(200).json({ message: 'Valid JSON received', body: req.body });
 });
 
-// ❌ Error Routes
+// Error Routes
 app.get('/error/unhandled', errorRoutes.unhandled);
 app.get('/error/handled', errorRoutes.handled);
 app.get('/error/async', errorRoutes.async);
@@ -104,12 +87,12 @@ app.get('/error/custom-span', errorRoutes.customSpan);
 app.get('/error/deleteFail', errorRoutes.deleteFail);
 app.get('/error/updateFail', errorRoutes.updateFail);
 
-// 📊 Metrics Route
+// Metrics Route
 app.get('/metrics', (req, res) => {
   res.json(getCounts());
 });
 
-// 🏥 Health Check Endpoints
+// Health Check Endpoints
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
@@ -131,19 +114,19 @@ app.get('/ready', (req, res) => {
   });
 });
 
-// ⛔️ 404 Handler
+// 404 Handler
 app.use((req, res, next) => {
   console.warn(`🚫 404 Not Found: ${req.method} ${req.url}`);
   res.status(404).send('404 - Route Not Found');
 });
 
-// 💥 Global Error Handler
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error(`❌ Error in ${req.method} ${req.url} →`, err.message);
   res.status(500).send('Caught by global error handler');
 });
 
-// 🚀 Server Start
+// Server Start
 app.listen(port, () => {
   console.log(`✅ App listening at http://localhost:${port}`);
 });

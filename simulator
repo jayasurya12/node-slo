@@ -38,7 +38,7 @@ parse_interval() {
     case "$unit" in
         ms)
             echo "0.$((num / 1000))" | sed 's/\.\.*/./' ;;
-        s|""")
+        s)
             echo "$num" ;;
         m)
             echo "$((num * 60))" ;;
@@ -52,7 +52,7 @@ parse_interval() {
 INTERVAL=$(parse_interval "$INTERVAL_STR")
 
 # Validate numeric inputs
-if ! [[ "$TOTAL_COUNT" =~ ^[0-9]+$ ]] || ! [[ "$ERROR_COUNT" =~ ^[0-9]+$ ]]; then
+if ! echo "$TOTAL_COUNT" | grep -qE '^[0-9]+$' || ! echo "$ERROR_COUNT" | grep -qE '^[0-9]+$'; then
     echo "Error: total_count and error_count must be numbers"
     exit 1
 fi

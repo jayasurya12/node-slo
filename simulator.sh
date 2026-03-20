@@ -29,7 +29,7 @@ echo ""
 
 # Check if server is running
 echo -n "Checking server health... "
-if ! curl -sf "${BASE_URL}/health" > /dev/null 2>&amp;1; then
+if ! curl -sf "${BASE_URL}/health" > /dev/null 2>&1; then
     echo -e "${RED}FAILED${NC}"
     echo "Server not responding at $BASE_URL"
     echo "Start the server with: npm start"
@@ -98,15 +98,15 @@ generate_load() {
     echo "Generating load: $REQUESTS requests with $CONCURRENT concurrent connections..."
 
     if command -v hey &> /dev/null; then
-        hey -n "$REQUESTS" -c "$CONCURRENT" -m GET "${BASE_URL}/success/200" > /dev/null 2>&amp;1
+        hey -n "$REQUESTS" -c "$CONCURRENT" -m GET "${BASE_URL}/success/200" > /dev/null 2>&1
     elif command -v ab &> /dev/null; then
-        ab -n "$REQUESTS" -c "$CONCURRENT" "${BASE_URL}/success/200" > /dev/null 2>&amp;1
+        ab -n "$REQUESTS" -c "$CONCURRENT" "${BASE_URL}/success/200" > /dev/null 2>&1
     else
         echo "Installing load generation tools..."
         if command -v apt-get &> /dev/null; then
-            sudo apt-get update > /dev/null 2>&amp;1 && sudo apt-get install -y apache2-utils > /dev/null 2>&amp;1
+            sudo apt-get update > /dev/null 2>&1 && sudo apt-get install -y apache2-utils > /dev/null 2>&1
         elif command -v yum &> /dev/null; then
-            sudo yum install -y httpd-tools > /dev/null 2>&amp;1
+            sudo yum install -y httpd-tools > /dev/null 2>&1
         fi
 
         # Fallback to curl loop
