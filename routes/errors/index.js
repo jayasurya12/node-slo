@@ -4,5 +4,6 @@ module.exports = {
   async: require('./asyncError'),
   customSpan: require('./customSpanError'),
   deleteFail: require('./deleteFail'),
-  updateFail: require('./updateFail')
+  updateFail: require('./updateFail'),
+  status: require('./statusError'),
 };

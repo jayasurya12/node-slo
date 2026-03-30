@@ -45,11 +45,12 @@ app.get('/', (req, res) => {
     <ul>
       <li><a href="/error/unhandled">/error/unhandled</a> - Throws unhandled exception</li>
       <li><a href="/error/handled">/error/handled</a> - Returns 500 error</li>
-      <li><a href="/error/async">/error/async> - Async Promise rejection</li>
+      <li><a href="/error/async">/error/async</a> - Async Promise rejection</li>
       <li><a href="/error/custom-span">/error/custom-span</a> - Custom Datadog span error</li>
       <li><a href="/error/deleteFail">/error/deleteFail</a> - DELETE failure</li>
       <li><a href="/error/updateFail">/error/updateFail</a> - PUT failure</li>
       <li>POST <code>/error/json</code> with invalid JSON - JSON parse error</li>
+      <li><a href="/error/status/500">/error/status/:code</a> - Dynamic error by status code (400, 401, 403, 404, 408, 409, 429, 500, 501, 502, 503, 504, ...)</li>
     </ul>
 
     <h2>🌐 External & Slow Routes</h2>
@@ -93,6 +94,10 @@ app.get('/error/async', errorRoutes.async);
 app.get('/error/custom-span', errorRoutes.customSpan);
 app.get('/error/deleteFail', errorRoutes.deleteFail);
 app.get('/error/updateFail', errorRoutes.updateFail);
+
+// Dynamic error status code route — supports any 4xx/5xx code
+// Usage: GET /error/status/404  GET /error/status/503  etc.
+app.get('/error/status/:code', errorRoutes.status);
 
 // Metrics Route
 app.get('/metrics', (req, res) => {
